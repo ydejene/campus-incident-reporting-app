@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">CampusCare symbol</title>
+  <desc id="desc">A deep teal protective location mark containing a white letter C and a coral resolution check.</desc>
+  <g>
+    <path fill="#00695C" d="M64 4C34 4 14 24 14 54C14 84 39 105 58 122C61.5 125.2 66.5 125.2 70 122C89 105 114 84 114 54C114 24 94 4 64 4Z"/>
+    <path fill="#FFFFFF" d="M81.5 41.5C75.8 35.8 68.8 32.7 60.3 32.7C43.6 32.7 31.5 45.2 31.5 62.6C31.5 80 43.6 92.5 60.3 92.5C73.4 92.5 83.3 85.3 89 75.8L77.3 68.8C73.7 75.2 68.4 78.9 60.8 78.9C51.3 78.9 44.6 72.1 44.6 62.6C44.6 53.1 51.3 46.3 60.8 46.3C66.5 46.3 71.1 48.6 74.8 52.3Z"/>
+    <path fill="none" stroke="#C2412D" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" d="M61 62L70 71L92 48.5"/>
+  </g>
+</svg>
