@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // Role verification reads trusted Firestore user document
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isStaff() {
+      return isAuthenticated() && getUserRole() == 'staff';
+    }
+
+    function isStudent() {
+      return isAuthenticated() && getUserRole() == 'student';
+    }
+
+    // User profile collection
+    match /users/{uid} {
+      // Users can read their own profile; staff can read profiles for incident follow-up
+      allow read: if isOwner(uid) || isStaff();
+
+      // Users can create their own profile, but default role must be 'student' (cannot self-assign 'staff')
+      allow create: if isOwner(uid)
+                    && request.resource.data.uid == uid
+                    && request.resource.data.role == 'student';
+
+      // Users can update their profile (e.g. displayName), but cannot change their role or UID
+      allow update: if isOwner(uid)
+                    && request.resource.data.uid == uid
+                    && request.resource.data.role == resource.data.role;
+
+      // Prevent client-side profile deletion
+      allow delete: if false;
+    }
+
+    // Incidents collection
+    match /incidents/{incidentId} {
+      // Authenticated users can browse campus-wide incident reports
+      allow read: if isAuthenticated();
+
+      // Students can create incidents with their UID as createdBy and initial status 'submitted'
+      allow create: if isAuthenticated()
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.status == 'submitted';
+
+      // Only authorized staff can update incident records (e.g. status)
+      // Students cannot modify status or ownership after submission
+      allow update: if isStaff()
+                    && request.resource.data.createdBy == resource.data.createdBy;
+
+      // Disallow client-side hard deletion
+      allow delete: if false;
+
+      // Status history subcollection
+      match /status_history/{historyId} {
+        // Authenticated users can view status progression history
+        allow read: if isAuthenticated();
+
+        // Only authorized staff can append status history entries
+        // Rejection requires an explanation remarks field
+        allow create: if isStaff()
+                      && request.resource.data.updatedBy == request.auth.uid
+                      && (request.resource.data.newStatus != 'rejected'
+                          || (request.resource.data.remarks is string && request.resource.data.remarks.size() > 0));
+
+        allow update, delete: if false;
+      }
+
+      // Private reporter subcollection (isolates sensitive reporter contact info)
+      match /private/reporter {
+        // Only the reporter who created the incident or authorized staff can read reporter details
+        allow read: if isOwner(get(/databases/$(database)/documents/incidents/$(incidentId)).data.createdBy) || isStaff();
+
+        // Created by the reporter during initial incident submission
+        allow create: if isAuthenticated()
+                      && request.resource.data.createdBy == request.auth.uid;
+
+        // Prevent modification or deletion of reporter records from client
+        allow update, delete: if false;
+      }
+    }
+  }
+}
+

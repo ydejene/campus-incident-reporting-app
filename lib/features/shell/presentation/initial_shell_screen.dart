@@ -34,7 +34,7 @@ class InitialShellScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     AppStrings.appTagline,
-                    style: textTheme.bodyMedium?.copyWith(
+                    style: textTheme.bodyLarge?.copyWith(
                       color: AppColors.textMuted,
                       letterSpacing: 0.5,
                       fontWeight: FontWeight.w500,
@@ -59,18 +59,20 @@ class InitialShellScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                'Design System & Status Tokens',
-                                style: textTheme.titleSmall,
+                              Expanded(
+                                child: Text(
+                                  'Design System & Status Tokens',
+                                  style: textTheme.titleMedium,
+                                ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 12),
                           Text(
                             'Status lifecycles with WCAG-compliant contrast surfaces and readable text labels:',
-                            style: textTheme.bodySmall,
+                            style: textTheme.bodyMedium,
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 16),
                           const Wrap(
                             spacing: 8,
                             runSpacing: 8,
@@ -93,7 +95,7 @@ class InitialShellScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'CampusCare Mobile Platform • Stage 1',
+                    'CampusCare Mobile Platform • Stage 2',
                     style: textTheme.labelSmall,
                     textAlign: TextAlign.center,
                   ),
@@ -106,4 +108,3 @@ class InitialShellScreen extends StatelessWidget {
     );
   }
 }
-

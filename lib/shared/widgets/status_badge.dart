@@ -1,16 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
+import '../../features/incidents/domain/models/incident_status.dart';
 
-enum IncidentStatus {
-  submitted('Submitted'),
-  underReview('Under Review'),
-  inProgress('In Progress'),
-  resolved('Resolved'),
-  rejected('Rejected');
-
-  const IncidentStatus(this.label);
-  final String label;
-}
+export '../../features/incidents/domain/models/incident_status.dart';
 
 class StatusBadge extends StatelessWidget {
   const StatusBadge({
@@ -69,4 +61,3 @@ class StatusBadge extends StatelessWidget {
     );
   }
 }
-
