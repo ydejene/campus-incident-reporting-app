@@ -9,6 +9,11 @@ import '../../features/authentication/presentation/screens/staff_unauthorized_sc
 import '../../features/authentication/presentation/screens/verify_email_screen.dart';
 import '../../features/dashboard/presentation/staff/staff_dashboard_screen.dart';
 import '../../features/dashboard/presentation/student/student_home_screen.dart';
+import '../../features/dashboard/presentation/student/student_shell_screen.dart';
+import '../../features/incidents/presentation/screens/student_browse_screen.dart';
+import '../../features/incidents/presentation/screens/student_my_reports_screen.dart';
+import '../../features/incidents/presentation/screens/student_report_screen.dart';
+import '../../features/profile/presentation/student_profile_screen.dart';
 import '../../features/shell/presentation/initial_shell_screen.dart';
 
 class RouterNotifier extends ChangeNotifier {
@@ -62,13 +67,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return null;
 
         case AuthStatus.authenticatedStudent:
-          if (isAuthRoute || loc == '/verify-email' || loc == '/staff-unauthorized' || loc == '/') {
+          if (isAuthRoute ||
+              loc == '/verify-email' ||
+              loc == '/staff-unauthorized' ||
+              loc == '/') {
             return '/student';
           }
           return null;
 
         case AuthStatus.authenticatedStaff:
-          if (isAuthRoute || loc == '/verify-email' || loc == '/staff-unauthorized' || loc == '/') {
+          if (isAuthRoute ||
+              loc == '/verify-email' ||
+              loc == '/staff-unauthorized' ||
+              loc == '/') {
             return '/staff';
           }
           return null;
@@ -103,10 +114,57 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'staffUnauthorized',
         builder: (context, state) => const StaffUnauthorizedScreen(),
       ),
-      GoRoute(
-        path: '/student',
-        name: 'studentHome',
-        builder: (context, state) => const StudentHomeScreen(),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return StudentShellScreen(navigationShell: navigationShell);
+        },
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student',
+                name: 'studentHome',
+                builder: (context, state) => const StudentHomeScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student/browse',
+                name: 'studentBrowse',
+                builder: (context, state) => const StudentBrowseScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student/report',
+                name: 'studentReport',
+                builder: (context, state) => const StudentReportScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student/my-reports',
+                name: 'studentMyReports',
+                builder: (context, state) => const StudentMyReportsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student/profile',
+                name: 'studentProfile',
+                builder: (context, state) => const StudentProfileScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
         path: '/staff',
