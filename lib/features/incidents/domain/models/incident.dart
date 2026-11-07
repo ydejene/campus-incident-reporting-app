@@ -34,7 +34,12 @@ class Incident {
   final String? photoUrl;
   final String? photoPublicId;
 
-  String get formattedLocation => '$building, Block $block, $specificArea';
+  String get formattedLocation {
+    if (block.trim().isEmpty) {
+      return '$building, $specificArea';
+    }
+    return '$building, Block $block, $specificArea';
+  }
 
   factory Incident.fromMap(Map<String, dynamic> map, {String? id}) {
     return Incident(
