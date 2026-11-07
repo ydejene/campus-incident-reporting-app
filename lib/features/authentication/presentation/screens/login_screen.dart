@@ -20,6 +20,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isGoogleLoading = false;
+  bool _isEmailLoading = false;
 
   @override
   void dispose() {
@@ -32,20 +34,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+    setState(() => _isEmailLoading = true);
     await ref.read(authControllerProvider.notifier).signInWithEmailAndPassword(
           email: _emailController.text,
           password: _passwordController.text,
         );
+    if (mounted) {
+      setState(() => _isEmailLoading = false);
+    }
   }
 
   Future<void> _signInWithGoogle() async {
+    setState(() => _isGoogleLoading = true);
     await ref.read(authControllerProvider.notifier).signInWithGoogle();
+    if (mounted) {
+      setState(() => _isGoogleLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final textTheme = Theme.of(context).textTheme;
+    final isAnyLoading = authState.isLoading || _isEmailLoading || _isGoogleLoading;
+    final showEmailSpinner = _isEmailLoading || (authState.isLoading && !_isGoogleLoading);
 
     return Scaffold(
       body: SafeArea(
@@ -135,7 +147,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       prefixIcon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
-                      enabled: !authState.isLoading,
+                      enabled: !isAnyLoading,
                       validator: ALUEmailValidator.validateLogin,
                     ),
                     const SizedBox(height: 16),
@@ -146,7 +158,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       prefixIcon: Icons.lock_outline,
                       isPassword: true,
                       textInputAction: TextInputAction.done,
-                      enabled: !authState.isLoading,
+                      enabled: !isAnyLoading,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Password is required';
@@ -156,8 +168,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
-                      onPressed: authState.isLoading ? null : _submit,
-                      child: authState.isLoading
+                      onPressed: isAnyLoading ? null : _submit,
+                      child: showEmailSpinner
                           ? const SizedBox(
                               width: 20,
                               height: 20,
@@ -184,8 +196,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 20),
                     GoogleSignInButton(
-                      onPressed: _signInWithGoogle,
-                      isLoading: authState.isLoading,
+                      onPressed: isAnyLoading ? null : _signInWithGoogle,
+                      isLoading: _isGoogleLoading,
                     ),
                     const SizedBox(height: 28),
                     Wrap(
@@ -197,7 +209,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           style: textTheme.bodySmall,
                         ),
                         GestureDetector(
-                          onTap: authState.isLoading
+                          onTap: isAnyLoading
                               ? null
                               : () => context.go('/register'),
                           child: Text(
@@ -220,4 +232,3 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 }
-

@@ -61,6 +61,18 @@ void main() {
       expect(state.profile?.role, UserRole.staff);
     });
 
+    test('unverified and staffPendingApproval factory states', () {
+      final unverifiedState = AuthState(
+        status: AuthStatus.unverified,
+      );
+      expect(unverifiedState.status, AuthStatus.unverified);
+
+      final pendingState = AuthState(
+        status: AuthStatus.staffPendingApproval,
+      );
+      expect(pendingState.status, AuthStatus.staffPendingApproval);
+    });
+
     test('copyWith updates state attributes immutably', () {
       final state = AuthState.initial();
       final updated = state.copyWith(
