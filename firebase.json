@@ -1,0 +1,24 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "campuscare-alu",
+          "appId": "1:430366098884:android:36953bb706c1ffb0ef5091",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "campuscare-alu",
+          "configurations": {
+            "android": "1:430366098884:android:36953bb706c1ffb0ef5091"
+          }
+        }
+      }
+    }
+  }
+}
