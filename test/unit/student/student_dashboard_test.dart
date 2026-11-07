@@ -7,6 +7,7 @@ import 'package:campus_incident_reporting_app/features/authentication/applicatio
 import 'package:campus_incident_reporting_app/features/authentication/domain/models/user_profile.dart';
 import 'package:campus_incident_reporting_app/features/authentication/domain/models/user_role.dart';
 import 'package:campus_incident_reporting_app/features/dashboard/presentation/student/student_home_screen.dart';
+import 'package:campus_incident_reporting_app/features/incidents/application/recent_campus_incidents_provider.dart';
 
 class MockStudentAuthController extends AuthController {
   MockStudentAuthController({this.customProfile});
@@ -33,29 +34,32 @@ class MockStudentAuthController extends AuthController {
   }
 }
 
+Widget _buildHomeScreen({UserProfile? customProfile}) {
+  return ProviderScope(
+    overrides: [
+      authControllerProvider
+          .overrideWith(() => MockStudentAuthController(customProfile: customProfile)),
+      recentCampusIncidentsProvider.overrideWith((ref) async => []),
+    ],
+    child: MaterialApp(
+      theme: AppTheme.lightTheme,
+      home: const StudentHomeScreen(),
+    ),
+  );
+}
+
 void main() {
   group('StudentHomeScreen Dashboard', () {
-    testWidgets('renders greeting, report action, shortcuts, and empty state',
+    testWidgets('renders greeting, report action, shortcuts, and static sections',
         (WidgetTester tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            authControllerProvider
-                .overrideWith(() => MockStudentAuthController()),
-          ],
-          child: MaterialApp(
-            theme: AppTheme.lightTheme,
-            home: const StudentHomeScreen(),
-          ),
-        ),
-      );
+      await tester.pumpWidget(_buildHomeScreen());
       await tester.pumpAndSettle();
 
       expect(find.text('Hello, Aline'), findsOneWidget);
       expect(find.text('Report a Campus Issue'), findsOneWidget);
       expect(find.text('Browse'), findsOneWidget);
       expect(find.text('My Reports'), findsOneWidget);
-      expect(find.text('No incidents reported yet'), findsOneWidget);
+      expect(find.text('Recent Campus Reports'), findsOneWidget);
       expect(find.text('How CampusCare Works'), findsOneWidget);
     });
 
@@ -71,24 +75,12 @@ void main() {
         updatedAt: now,
       );
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            authControllerProvider.overrideWith(
-              () => MockStudentAuthController(customProfile: blankProfile),
-            ),
-          ],
-          child: MaterialApp(
-            theme: AppTheme.lightTheme,
-            home: const StudentHomeScreen(),
-          ),
-        ),
-      );
+      await tester.pumpWidget(_buildHomeScreen(customProfile: blankProfile));
       await tester.pumpAndSettle();
 
       expect(find.text('Hello, ALU Student'), findsOneWidget);
       expect(find.text('Report a Campus Issue'), findsOneWidget);
-      expect(find.text('No incidents reported yet'), findsOneWidget);
+      expect(find.text('Recent Campus Reports'), findsOneWidget);
     });
   });
 }

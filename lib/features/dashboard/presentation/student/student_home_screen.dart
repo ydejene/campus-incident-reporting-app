@@ -5,6 +5,8 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/brand_logo.dart';
 import '../../../authentication/application/auth_controller.dart';
+import '../../../incidents/application/recent_campus_incidents_provider.dart';
+import '../../../incidents/presentation/widgets/incident_card.dart';
 
 class StudentHomeScreen extends ConsumerWidget {
   const StudentHomeScreen({super.key});
@@ -248,72 +250,23 @@ class StudentHomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
 
-              // Recent Reports Section with Polished Empty State
+              // Recent Campus Reports Section
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Recent Reports',
+                    'Recent Campus Reports',
                     style: textTheme.titleMedium,
                   ),
                   TextButton(
-                    onPressed: () => context.go('/student/my-reports'),
+                    onPressed: () => context.go('/student/browse'),
                     child: const Text('View all'),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
 
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 28,
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: AppColors.statusInProgressBg,
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: const Icon(
-                          Icons.inbox_outlined,
-                          color: AppColors.primary,
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No incidents reported yet',
-                        style: textTheme.titleSmall,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'You have not submitted any campus reports. When you report a facility, safety, or maintenance issue, you will be able to follow its review status here.',
-                        style: textTheme.bodySmall?.copyWith(
-                          color: AppColors.textMuted,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: () => context.go('/student/report'),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(180, 40),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                        ),
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Report an Issue'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              _RecentCampusReports(textTheme: textTheme),
               const SizedBox(height: 24),
 
               // How CampusCare Works Guidance
@@ -372,6 +325,100 @@ class StudentHomeScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _RecentCampusReports extends ConsumerWidget {
+  const _RecentCampusReports({required this.textTheme});
+
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recentAsync = ref.watch(recentCampusIncidentsProvider);
+
+    return recentAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(child: LinearProgressIndicator()),
+      ),
+      error: (error, _) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              const Icon(Icons.error_outline, color: AppColors.accent, size: 32),
+              const SizedBox(height: 8),
+              Text(
+                'Could not load recent reports',
+                style: textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () =>
+                    ref.invalidate(recentCampusIncidentsProvider),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (incidents) {
+        if (incidents.isEmpty) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+              child: Column(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: const BoxDecoration(
+                      color: AppColors.statusInProgressBg,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.inbox_outlined,
+                      color: AppColors.primary,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No campus reports yet',
+                    style: textTheme.titleSmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'No incidents have been reported on campus. Be the first to flag a facility or safety issue.',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppColors.textMuted,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: [
+            for (final incident in incidents)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: IncidentCard(
+                  incident: incident,
+                  onTap: () => context.push('/incident/${incident.id}'),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
