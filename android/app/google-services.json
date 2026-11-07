@@ -12,7 +12,20 @@
           "package_name": "com.campuscare.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "430366098884-hhui2epvuiqsed79o2ucfg6pr1kij46h.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.campuscare.app",
+            "certificate_hash": "228c0648e031c6bfaa26a9cf8c231c43be326ae4"
+          }
+        },
+        {
+          "client_id": "430366098884-4gash13n86fsc7i7s6de7gtg8dth8k9v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDsewBkJEa7N_-rN9dcaoCYflgnpM9STuk"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "430366098884-4gash13n86fsc7i7s6de7gtg8dth8k9v.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
