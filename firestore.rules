@@ -1,4 +1,5 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -6,100 +7,126 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isEmailVerified() {
+      return isAuthenticated()
+        && request.auth.token.email_verified == true;
+    }
+
+    function isEligibleALUEmail() {
+      return isAuthenticated()
+        && request.auth.token.email is string
+        && (
+          request.auth.token.email.matches('^[^@]+@alustudent[.]com$')
+          || request.auth.token.email.matches('^[^@]+@alueducation[.]com$')
+        );
+    }
+
+    function userDocExists() {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserRole() {
+      return userDocExists()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : null;
+    }
+
+    function isStudent() {
+      return isEmailVerified()
+        && isEligibleALUEmail()
+        && userDocExists()
+        && getUserRole() == 'student';
+    }
+
+    function isStaff() {
+      return isEmailVerified()
+        && isEligibleALUEmail()
+        && userDocExists()
+        && getUserRole() == 'staff';
+    }
+
     function isOwner(uid) {
       return isAuthenticated() && request.auth.uid == uid;
     }
 
-    function isEmailVerified() {
-      return isAuthenticated() && request.auth.token.email_verified == true;
-    }
-
-    function isEligibleALUEmail() {
-      return isAuthenticated() && (
-        request.auth.token.email.matches('.*@alustudent[.]com$') ||
-        request.auth.token.email.matches('.*@alueducation[.]com$')
-      );
-    }
-
-    // Role verification reads trusted Firestore user document
-    function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
-    function isStaff() {
-      return isAuthenticated() && isEmailVerified() && getUserRole() == 'staff';
-    }
-
-    function isStudent() {
-      return isAuthenticated() && isEmailVerified() && getUserRole() == 'student';
-    }
-
-    // User profile collection
+    // User profiles
     match /users/{uid} {
-      // Users can read their own profile; verified staff can read profiles for incident follow-up
-      allow read: if isOwner(uid) || isStaff();
+      allow read: if
+        (isOwner(uid) && isEmailVerified() && isEligibleALUEmail())
+        || isStaff();
 
-      // Verified users can create their own profile, but default role must be 'student' (cannot self-assign 'staff')
       allow create: if isOwner(uid)
-                    && isEmailVerified()
-                    && request.resource.data.uid == uid
-                    && request.resource.data.role == 'student';
+        && isEmailVerified()
+        && isEligibleALUEmail()
+        && request.resource.data.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role == 'student'
+        && request.resource.data.keys().hasAll(['uid', 'email', 'role'])
+        && request.resource.data.keys().hasOnly([
+          'uid', 'displayName', 'email', 'role',
+          'createdAt', 'updatedAt'
+        ]);
 
-      // Users can update their profile (e.g. displayName), but cannot change their role or UID
       allow update: if isOwner(uid)
-                    && request.resource.data.uid == uid
-                    && request.resource.data.role == resource.data.role;
+        && isEmailVerified()
+        && isEligibleALUEmail()
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['displayName', 'updatedAt']);
 
-      // Prevent client-side profile deletion
       allow delete: if false;
     }
 
-    // Incidents collection
+    // Incident records
     match /incidents/{incidentId} {
-      // Authenticated, verified users can browse campus-wide incident reports
-      allow read: if isAuthenticated() && isEmailVerified();
+      allow read: if isStudent() || isStaff();
 
-      // Verified students can create incidents with their UID as createdBy and initial status 'submitted'
-      allow create: if isAuthenticated()
-                    && isEmailVerified()
-                    && request.resource.data.createdBy == request.auth.uid
-                    && request.resource.data.status == 'submitted';
+      allow create: if isStudent()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.status == 'submitted';
 
-      // Only authorized staff can update incident records (e.g. status)
-      // Students cannot modify status or ownership after submission
       allow update: if isStaff()
-                    && request.resource.data.createdBy == resource.data.createdBy;
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'updatedAt']);
 
-      // Disallow client-side hard deletion
       allow delete: if false;
 
-      // Status history subcollection
+      // Status history
       match /status_history/{historyId} {
-        // Authenticated, verified users can view status progression history
-        allow read: if isAuthenticated() && isEmailVerified();
+        allow read: if isStudent() || isStaff();
 
-        // Only authorized staff can append status history entries
-        // Rejection requires an explanation remarks field
         allow create: if isStaff()
-                      && request.resource.data.updatedBy == request.auth.uid
-                      && (request.resource.data.newStatus != 'rejected'
-                          || (request.resource.data.remarks is string && request.resource.data.remarks.size() > 0));
+          && request.resource.data.updatedBy == request.auth.uid
+          && (
+            request.resource.data.newStatus != 'rejected'
+            || (
+              request.resource.data.remarks is string
+              && request.resource.data.remarks.size() > 0
+            )
+          );
 
         allow update, delete: if false;
       }
 
-      // Private reporter subcollection (isolates sensitive reporter contact info)
+      // Private reporter information
       match /private/reporter {
-        // Only the reporter who created the incident or authorized staff can read reporter details
-        allow read: if (isOwner(get(/databases/$(database)/documents/incidents/$(incidentId)).data.createdBy) || isStaff())
-                    && isEmailVerified();
+        allow read: if isEmailVerified()
+          && isEligibleALUEmail()
+          && (
+            get(/databases/$(database)/documents/incidents/$(incidentId))
+              .data.createdBy == request.auth.uid
+            || isStaff()
+          );
 
-        // Created by the verified reporter during initial incident submission
-        allow create: if isAuthenticated()
-                      && isEmailVerified()
-                      && request.resource.data.createdBy == request.auth.uid;
+        allow create: if isStudent()
+          && get(/databases/$(database)/documents/incidents/$(incidentId))
+            .data.createdBy == request.auth.uid
+          && request.resource.data.createdBy == request.auth.uid;
 
-        // Prevent modification or deletion of reporter records from client
         allow update, delete: if false;
       }
     }

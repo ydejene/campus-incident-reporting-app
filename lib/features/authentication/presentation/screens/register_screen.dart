@@ -21,6 +21,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  bool _isRegisterLoading = false;
 
   @override
   void dispose() {
@@ -35,17 +36,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+    setState(() => _isRegisterLoading = true);
     await ref.read(authControllerProvider.notifier).registerStudent(
           email: _emailController.text,
           password: _passwordController.text,
           displayName: _nameController.text,
         );
+    if (mounted) {
+      setState(() => _isRegisterLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final textTheme = Theme.of(context).textTheme;
+    final isLoading = authState.isLoading || _isRegisterLoading;
 
     return Scaffold(
       body: SafeArea(
@@ -155,7 +161,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       hint: 'e.g. John Doe',
                       prefixIcon: Icons.person_outline,
                       textInputAction: TextInputAction.next,
-                      enabled: !authState.isLoading,
+                      enabled: !isLoading,
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Full name is required';
@@ -171,21 +177,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       prefixIcon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
-                      enabled: !authState.isLoading,
+                      enabled: !isLoading,
                       validator: ALUEmailValidator.validateStudentRegistration,
                     ),
                     const SizedBox(height: 14),
                     AuthTextField(
                       controller: _passwordController,
                       label: 'Password',
-                      hint: 'At least 6 characters',
+                      hint: 'At least 8 characters (letters & numbers)',
                       prefixIcon: Icons.lock_outline,
                       isPassword: true,
                       textInputAction: TextInputAction.next,
-                      enabled: !authState.isLoading,
+                      enabled: !isLoading,
                       validator: (value) {
-                        if (value == null || value.length < 6) {
-                          return 'Password must be at least 6 characters';
+                        if (value == null || value.isEmpty) {
+                          return 'Password is required';
+                        }
+                        if (value.length < 8) {
+                          return 'Password must be at least 8 characters long';
+                        }
+                        final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(value);
+                        final hasDigit = RegExp(r'[0-9]').hasMatch(value);
+                        if (!hasLetter || !hasDigit) {
+                          return 'Password must contain both letters and numbers';
                         }
                         return null;
                       },
@@ -198,7 +212,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       prefixIcon: Icons.lock_clock_outlined,
                       isPassword: true,
                       textInputAction: TextInputAction.done,
-                      enabled: !authState.isLoading,
+                      enabled: !isLoading,
                       validator: (value) {
                         if (value != _passwordController.text) {
                           return 'Passwords do not match';
@@ -208,8 +222,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
-                      onPressed: authState.isLoading ? null : _submit,
-                      child: authState.isLoading
+                      onPressed: isLoading ? null : _submit,
+                      child: isLoading
                           ? const SizedBox(
                               width: 20,
                               height: 20,
@@ -230,7 +244,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           style: textTheme.bodySmall,
                         ),
                         GestureDetector(
-                          onTap: authState.isLoading
+                          onTap: isLoading
                               ? null
                               : () => context.go('/login'),
                           child: Text(
@@ -253,4 +267,3 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 }
-

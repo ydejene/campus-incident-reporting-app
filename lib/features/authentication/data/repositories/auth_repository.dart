@@ -64,7 +64,6 @@ class AuthRepository {
 
     await firestore.collection('users').doc(uid).set(
           profile.toFirestore(),
-          SetOptions(merge: true),
         );
 
     return profile;
@@ -178,6 +177,7 @@ class AuthRepository {
     final user = firebaseAuth.currentUser;
     if (user == null) return false;
     await user.reload();
+    await firebaseAuth.currentUser?.getIdToken(true);
     return firebaseAuth.currentUser?.emailVerified ?? false;
   }
 

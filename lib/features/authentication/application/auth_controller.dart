@@ -54,25 +54,45 @@ class AuthController extends Notifier<AuthState> {
     state = state.copyWith(isLoading: true);
     final repository = ref.read(authRepositoryProvider);
 
-    if (ALUEmailValidator.isStudentEmail(normalized)) {
-      var profile = await repository.fetchUserProfile(user.uid);
-      profile ??= await repository.createStudentProfile(
-        uid: user.uid,
-        email: normalized,
-        displayName: user.displayName ?? 'ALU Student',
-      );
-      state = AuthState.authenticatedStudent(user: user, profile: profile);
-      return;
-    }
+    try {
+      // Force refresh ID token so Firebase Security Rules receive the updated email_verified: true claim
+      await user.getIdToken(true);
 
-    if (ALUEmailValidator.isStaffEmail(normalized)) {
-      final profile = await repository.fetchUserProfile(user.uid);
-      if (profile != null && profile.role == UserRole.staff) {
-        state = AuthState.authenticatedStaff(user: user, profile: profile);
-      } else {
-        // Staff domain email without provisioned staff profile document
-        state = AuthState.staffPendingApproval(user);
+      if (ALUEmailValidator.isStudentEmail(normalized)) {
+        var profile = await repository.fetchUserProfile(user.uid).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw TimeoutException('Connection timeout: Unable to reach Firestore database.'),
+        );
+        profile ??= await repository.createStudentProfile(
+          uid: user.uid,
+          email: normalized,
+          displayName: user.displayName ?? 'ALU Student',
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw TimeoutException('Connection timeout: Unable to reach Firestore database.'),
+        );
+        state = AuthState.authenticatedStudent(user: user, profile: profile);
+        return;
       }
+
+      if (ALUEmailValidator.isStaffEmail(normalized)) {
+        final profile = await repository.fetchUserProfile(user.uid).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw TimeoutException('Connection timeout: Unable to reach Firestore database.'),
+        );
+        if (profile != null && profile.role == UserRole.staff) {
+          state = AuthState.authenticatedStaff(user: user, profile: profile);
+        } else {
+          // Staff domain email without provisioned staff profile document
+          state = AuthState.staffPendingApproval(user);
+        }
+        return;
+      }
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: _cleanErrorMessage(e),
+      );
       return;
     }
 
@@ -93,13 +113,13 @@ class AuthController extends Notifier<AuthState> {
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: _mapAuthError(e),
+        errorMessage: _cleanErrorMessage(e),
       );
       return false;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: e.toString(),
+        errorMessage: _cleanErrorMessage(e),
       );
       return false;
     }
@@ -121,13 +141,13 @@ class AuthController extends Notifier<AuthState> {
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: _mapAuthError(e),
+        errorMessage: _cleanErrorMessage(e),
       );
       return false;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: e.toString(),
+        errorMessage: _cleanErrorMessage(e),
       );
       return false;
     }
@@ -147,13 +167,13 @@ class AuthController extends Notifier<AuthState> {
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: _mapAuthError(e),
+        errorMessage: _cleanErrorMessage(e),
       );
       return false;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: e.toString(),
+        errorMessage: _cleanErrorMessage(e),
       );
       return false;
     }
@@ -167,25 +187,33 @@ class AuthController extends Notifier<AuthState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Unable to send verification email. Please try again later.',
+        errorMessage: _cleanErrorMessage(e),
       );
     }
   }
 
   Future<bool> checkEmailVerification() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
-    final verified =
-        await ref.read(authRepositoryProvider).reloadAndCheckVerification();
-    if (verified) {
-      final user = ref.read(authRepositoryProvider).currentUser;
-      await _handleUserChanged(user);
-    } else {
+    try {
+      final verified =
+          await ref.read(authRepositoryProvider).reloadAndCheckVerification();
+      if (verified) {
+        final user = ref.read(authRepositoryProvider).currentUser;
+        await _handleUserChanged(user);
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Email is not verified yet. Please check your inbox and click the link.',
+        );
+      }
+      return verified;
+    } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Email is not verified yet. Please check your inbox and click the link.',
+        errorMessage: _cleanErrorMessage(e),
       );
+      return false;
     }
-    return verified;
   }
 
   Future<void> signOut() async {
@@ -198,7 +226,57 @@ class AuthController extends Notifier<AuthState> {
     state = state.copyWith(errorMessage: null);
   }
 
+  String _cleanErrorMessage(Object error) {
+    if (error is FirebaseAuthException) {
+      return _mapAuthError(error);
+    }
+
+    final str = error.toString().toLowerCase();
+
+    if (str.contains('network') ||
+        str.contains('socketexception') ||
+        str.contains('failed to connect') ||
+        str.contains('googleapis') ||
+        str.contains('network_error') ||
+        str.contains('unreachable')) {
+      return 'Network connection issue. Please check your internet connection and try again.';
+    }
+    if (str.contains('permission-denied') || str.contains('insufficient permissions')) {
+      return 'Access denied. You do not have permission to perform this operation.';
+    }
+    if (str.contains('timeout')) {
+      return 'Connection timed out. Please check your internet connection and try again.';
+    }
+    if (str.contains('user-not-found') ||
+        str.contains('wrong-password') ||
+        str.contains('invalid-credential')) {
+      return 'Incorrect email or password. Please check your details and try again.';
+    }
+    if (str.contains('email-already-in-use')) {
+      return 'An account already exists with this email. Please sign in instead.';
+    }
+    if (str.contains('not_found') || str.contains('database')) {
+      return 'Database service unavailable. Please try again in a few moments.';
+    }
+
+    return 'An unexpected error occurred. Please try again.';
+  }
+
   String _mapAuthError(FirebaseAuthException e) {
+    final msgLower = (e.message ?? '').toLowerCase();
+
+    // Catch network / socket drops embedded inside FirebaseAuthException
+    if (e.code == 'network-request-failed' ||
+        msgLower.contains('failed to connect') ||
+        msgLower.contains('googleapis') ||
+        msgLower.contains('socketexception') ||
+        msgLower.contains('unreachable') ||
+        msgLower.contains('network_error') ||
+        msgLower.contains('timeout') ||
+        (e.message != null && e.message!.contains('['))) {
+      return 'Network connection issue. Please check your internet connection and try again.';
+    }
+
     switch (e.code) {
       case 'ineligible-email':
         return e.message ?? 'Ineligible email domain.';
@@ -210,7 +288,7 @@ class AuthController extends Notifier<AuthState> {
       case 'email-already-in-use':
         return 'An account already exists with this email. Please sign in instead.';
       case 'weak-password':
-        return 'The password is too weak. Please use at least 6 characters.';
+        return 'The password is too weak. Please use at least 8 characters.';
       case 'invalid-email':
         return 'The email format is invalid.';
       case 'user-disabled':
@@ -218,8 +296,7 @@ class AuthController extends Notifier<AuthState> {
       case 'too-many-requests':
         return 'Too many failed attempts. Please wait a few moments and try again.';
       default:
-        return e.message ?? 'Authentication failed. Please try again.';
+        return 'Authentication failed. Please try again.';
     }
   }
 }
-
