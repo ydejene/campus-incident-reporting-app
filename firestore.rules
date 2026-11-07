@@ -10,26 +10,38 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == uid;
     }
 
+    function isEmailVerified() {
+      return isAuthenticated() && request.auth.token.email_verified == true;
+    }
+
+    function isEligibleALUEmail() {
+      return isAuthenticated() && (
+        request.auth.token.email.matches('.*@alustudent[.]com$') ||
+        request.auth.token.email.matches('.*@alueducation[.]com$')
+      );
+    }
+
     // Role verification reads trusted Firestore user document
     function getUserRole() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
     function isStaff() {
-      return isAuthenticated() && getUserRole() == 'staff';
+      return isAuthenticated() && isEmailVerified() && getUserRole() == 'staff';
     }
 
     function isStudent() {
-      return isAuthenticated() && getUserRole() == 'student';
+      return isAuthenticated() && isEmailVerified() && getUserRole() == 'student';
     }
 
     // User profile collection
     match /users/{uid} {
-      // Users can read their own profile; staff can read profiles for incident follow-up
+      // Users can read their own profile; verified staff can read profiles for incident follow-up
       allow read: if isOwner(uid) || isStaff();
 
-      // Users can create their own profile, but default role must be 'student' (cannot self-assign 'staff')
+      // Verified users can create their own profile, but default role must be 'student' (cannot self-assign 'staff')
       allow create: if isOwner(uid)
+                    && isEmailVerified()
                     && request.resource.data.uid == uid
                     && request.resource.data.role == 'student';
 
@@ -44,11 +56,12 @@ service cloud.firestore {
 
     // Incidents collection
     match /incidents/{incidentId} {
-      // Authenticated users can browse campus-wide incident reports
-      allow read: if isAuthenticated();
+      // Authenticated, verified users can browse campus-wide incident reports
+      allow read: if isAuthenticated() && isEmailVerified();
 
-      // Students can create incidents with their UID as createdBy and initial status 'submitted'
+      // Verified students can create incidents with their UID as createdBy and initial status 'submitted'
       allow create: if isAuthenticated()
+                    && isEmailVerified()
                     && request.resource.data.createdBy == request.auth.uid
                     && request.resource.data.status == 'submitted';
 
@@ -62,8 +75,8 @@ service cloud.firestore {
 
       // Status history subcollection
       match /status_history/{historyId} {
-        // Authenticated users can view status progression history
-        allow read: if isAuthenticated();
+        // Authenticated, verified users can view status progression history
+        allow read: if isAuthenticated() && isEmailVerified();
 
         // Only authorized staff can append status history entries
         // Rejection requires an explanation remarks field
@@ -78,10 +91,12 @@ service cloud.firestore {
       // Private reporter subcollection (isolates sensitive reporter contact info)
       match /private/reporter {
         // Only the reporter who created the incident or authorized staff can read reporter details
-        allow read: if isOwner(get(/databases/$(database)/documents/incidents/$(incidentId)).data.createdBy) || isStaff();
+        allow read: if (isOwner(get(/databases/$(database)/documents/incidents/$(incidentId)).data.createdBy) || isStaff())
+                    && isEmailVerified();
 
-        // Created by the reporter during initial incident submission
+        // Created by the verified reporter during initial incident submission
         allow create: if isAuthenticated()
+                      && isEmailVerified()
                       && request.resource.data.createdBy == request.auth.uid;
 
         // Prevent modification or deletion of reporter records from client
@@ -90,4 +105,3 @@ service cloud.firestore {
     }
   }
 }
-
