@@ -8,9 +8,11 @@ class StatusBadge extends StatelessWidget {
   const StatusBadge({
     super.key,
     required this.status,
+    this.showIcon = false,
   });
 
   final IncidentStatus status;
+  final bool showIcon;
 
   Color get _backgroundColor {
     switch (status) {
@@ -42,6 +44,21 @@ class StatusBadge extends StatelessWidget {
     }
   }
 
+  IconData get _icon {
+    switch (status) {
+      case IncidentStatus.submitted:
+        return Icons.inbox_outlined;
+      case IncidentStatus.underReview:
+        return Icons.search_outlined;
+      case IncidentStatus.inProgress:
+        return Icons.autorenew_outlined;
+      case IncidentStatus.resolved:
+        return Icons.check_circle_outlined;
+      case IncidentStatus.rejected:
+        return Icons.cancel_outlined;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -50,13 +67,22 @@ class StatusBadge extends StatelessWidget {
         color: _backgroundColor,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Text(
-        status.label,
-        style: TextStyle(
-          color: _textColor,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showIcon) ...[
+            Icon(_icon, size: 14, color: _textColor),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            status.label,
+            style: TextStyle(
+              color: _textColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

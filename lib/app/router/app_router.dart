@@ -10,6 +10,7 @@ import '../../features/authentication/presentation/screens/verify_email_screen.d
 import '../../features/dashboard/presentation/staff/staff_dashboard_screen.dart';
 import '../../features/dashboard/presentation/student/student_home_screen.dart';
 import '../../features/dashboard/presentation/student/student_shell_screen.dart';
+import '../../features/incidents/presentation/screens/incident_detail_screen.dart';
 import '../../features/incidents/presentation/screens/student_browse_screen.dart';
 import '../../features/incidents/presentation/screens/student_my_reports_screen.dart';
 import '../../features/incidents/presentation/screens/student_report_screen.dart';
@@ -165,6 +166,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/incident/:id',
+        name: 'incidentDetail',
+        builder: (context, state) {
+          final incidentId = state.pathParameters['id'] ?? '';
+          return IncidentDetailScreen(incidentId: incidentId);
+        },
       ),
       GoRoute(
         path: '/staff',

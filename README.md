@@ -26,6 +26,32 @@ CampusCare uses **Firebase Authentication** (email/password and Google Sign-In) 
 
 > Firebase Storage is **not** used for image storage. Cloudinary was selected following facilitator approval because Firebase Storage requires Blaze (pay-as-you-go) billing, which is impractical for this academic project.
 
+### Firestore Composite Indexes
+
+For student personal report queries (`createdBy == uid` ordered by `createdAt DESC`), Firestore requires a composite index. The index definition is stored in `firestore.indexes.json`:
+
+```json
+{
+  "indexes": [
+    {
+      "collectionGroup": "incidents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "createdBy", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
+```
+
+Deploy the index to your Firebase project using the Firebase CLI:
+
+```bash
+firebase deploy --only firestore:indexes
+```
+
 ---
 
 ## Cloudinary Image Upload
@@ -63,6 +89,39 @@ If the `--dart-define` flags are omitted, incident reports can still be submitte
 
 ---
 
+## Incident Discovery and Tracking (Stage 6)
+
+### Campus-Wide Browse
+
+Students can browse public campus incident documents ordered chronologically (newest first). Each report card displays:
+- Incident category with tinted surface styling
+- Current status badge with high-contrast label and contextual icon
+- Short description preview
+- Formatted location (`building, block, specific area`)
+- Submission date
+- Optional photo thumbnail if an image was attached
+
+### Search & Filtering
+
+- **Case-Insensitive Search:** Matches keywords across description, category label, building name, block/wing, specific area, and formatted location.
+- **Category & Status Filters:** Interactive filter chips that narrow results instantly.
+- **Combined Filtering:** Search and filters work seamlessly together. An active filter bar shows the matching count and provides a one-tap "Clear Filters" action.
+- **Cursor-Based Pagination:** Loads reports in 20-record pages using Firestore document cursors (`startAfterDocument`), with clear feedback showing how many reports are loaded and a button to fetch additional pages from the server.
+
+### My Reports
+
+- Dedicated personal tracking screen listing only reports created by the currently authenticated student (`createdBy == uid`).
+- Displays live status badges and submission dates.
+- Includes quick-search, status filtering, pull-to-refresh, and an empty state guiding users to report issues.
+
+### Incident Details & Status History
+
+- Single reusable detail screen (`/incident/:id`) accessible from both Browse and My Reports.
+- Displays full issue description, location details, submission timestamp, and full-resolution photograph with error/loading handlers.
+- **Chronological Status History:** Renders lifecycle transitions from the `status_history` subcollection with timestamps and staff remarks. If no updates have been posted yet, an informative card indicates that the report is awaiting initial review.
+
+---
+
 ## Architecture
 
 | Layer | Technology |
@@ -90,5 +149,5 @@ The project uses a **feature-first layered architecture**: each feature owns its
 
 ## Known Limitations
 
-- **Orphaned Cloudinary assets:** If a Cloudinary image upload succeeds but the subsequent Firestore write fails, the uploaded image cannot be automatically deleted from the client because Cloudinary deletion requires an API secret that must not be embedded in a client application. The resulting orphaned asset is a cosmetic concern and does not affect Firestore data integrity. The user will see a submission error and can try again.
-- Incident browsing (Stage 6) and My Reports listing are placeholder screens pending implementation.
+- **Search Scope with Pagination:** Full-text search is performed client-side on loaded incident pages because Cloud Firestore does not provide native full-text search. The UI clearly informs users how many reports are loaded and allows fetching further pages with "Load More from Server".
+- **Orphaned Cloudinary assets:** If a Cloudinary image upload succeeds but the subsequent Firestore write fails, the uploaded image cannot be automatically deleted from the client because Cloudinary deletion requires an API secret that must not be embedded in a client application. The resulting orphaned asset is a cosmetic concern and does not affect Firestore data integrity.
