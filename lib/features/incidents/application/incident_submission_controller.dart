@@ -6,6 +6,11 @@ import '../domain/models/incident_category.dart';
 import '../domain/models/incident_private_reporter.dart';
 import '../../authentication/application/auth_controller.dart';
 import '../../authentication/application/auth_state.dart';
+import '../../dashboard/application/staff_dashboard_controller.dart';
+import 'browse_incidents_controller.dart';
+import 'my_reports_controller.dart';
+import 'recent_campus_incidents_provider.dart';
+import 'staff_incidents_controller.dart';
 
 /// Describes the phase the submission form is currently in.
 enum IncidentSubmissionStatus {
@@ -168,6 +173,13 @@ class IncidentSubmissionController
         incident: incident,
         privateReporter: privateReporter,
       );
+
+      // Invalidate cached incident listing providers so new report appears instantly
+      ref.invalidate(myReportsControllerProvider);
+      ref.invalidate(browseIncidentsControllerProvider);
+      ref.invalidate(recentCampusIncidentsProvider);
+      ref.invalidate(staffIncidentsControllerProvider);
+      ref.invalidate(staffDashboardControllerProvider);
 
       state = state.copyWith(
         status: IncidentSubmissionStatus.success,
