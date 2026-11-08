@@ -112,7 +112,7 @@ class StudentHomeScreen extends ConsumerWidget {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: const Text(
-                                'Main Action',
+                                'Quick Report',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 11,
