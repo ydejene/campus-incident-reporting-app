@@ -8,6 +8,7 @@ import '../../features/authentication/presentation/screens/register_screen.dart'
 import '../../features/authentication/presentation/screens/staff_unauthorized_screen.dart';
 import '../../features/authentication/presentation/screens/verify_email_screen.dart';
 import '../../features/dashboard/presentation/staff/staff_dashboard_screen.dart';
+import '../../features/dashboard/presentation/staff/staff_shell_screen.dart';
 import '../../features/dashboard/presentation/student/student_home_screen.dart';
 import '../../features/dashboard/presentation/student/student_shell_screen.dart';
 import '../../features/incidents/presentation/screens/incident_detail_screen.dart';
@@ -15,6 +16,7 @@ import '../../features/incidents/presentation/screens/staff_incidents_screen.dar
 import '../../features/incidents/presentation/screens/student_browse_screen.dart';
 import '../../features/incidents/presentation/screens/student_my_reports_screen.dart';
 import '../../features/incidents/presentation/screens/student_report_screen.dart';
+import '../../features/profile/presentation/staff_profile_screen.dart';
 import '../../features/profile/presentation/student_profile_screen.dart';
 import '../../features/shell/presentation/initial_shell_screen.dart';
 
@@ -75,6 +77,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               loc == '/') {
             return '/student';
           }
+          if (loc.startsWith('/staff')) {
+            return '/student';
+          }
           return null;
 
         case AuthStatus.authenticatedStaff:
@@ -82,6 +87,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               loc == '/verify-email' ||
               loc == '/staff-unauthorized' ||
               loc == '/') {
+            return '/staff';
+          }
+          if (loc.startsWith('/student')) {
             return '/staff';
           }
           return null;
@@ -176,15 +184,39 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return IncidentDetailScreen(incidentId: incidentId);
         },
       ),
-      GoRoute(
-        path: '/staff',
-        name: 'staffDashboard',
-        builder: (context, state) => const StaffDashboardScreen(),
-      ),
-      GoRoute(
-        path: '/staff/incidents',
-        name: 'staffIncidents',
-        builder: (context, state) => const StaffIncidentsScreen(),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return StaffShellScreen(navigationShell: navigationShell);
+        },
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/staff',
+                name: 'staffDashboard',
+                builder: (context, state) => const StaffDashboardScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/staff/incidents',
+                name: 'staffIncidents',
+                builder: (context, state) => const StaffIncidentsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/staff/profile',
+                name: 'staffProfile',
+                builder: (context, state) => const StaffProfileScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
         path: '/foundation',
