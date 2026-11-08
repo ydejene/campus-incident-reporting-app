@@ -90,17 +90,29 @@ service cloud.firestore {
 
       allow update: if isStaff()
         && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.status in [
+          'submitted', 'under_review', 'in_progress', 'resolved', 'rejected'
+        ]
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status', 'updatedAt']);
 
       allow delete: if false;
 
-      // Status history
+      // Status history (publicly readable audit trail; atomically written with parent update)
       match /status_history/{historyId} {
         allow read: if isStudent() || isStaff();
 
         allow create: if isStaff()
           && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.previousStatus in [
+            'submitted', 'under_review', 'in_progress', 'resolved', 'rejected'
+          ]
+          && request.resource.data.newStatus in [
+            'submitted', 'under_review', 'in_progress', 'resolved', 'rejected'
+          ]
+          && request.resource.data.previousStatus != request.resource.data.newStatus
+          && request.resource.data.previousStatus == get(/databases/$(database)/documents/incidents/$(incidentId)).data.status
+          && request.resource.data.newStatus == getAfter(/databases/$(database)/documents/incidents/$(incidentId)).data.status
           && (
             request.resource.data.newStatus != 'rejected'
             || (

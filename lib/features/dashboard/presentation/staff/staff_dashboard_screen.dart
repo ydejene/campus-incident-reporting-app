@@ -24,7 +24,7 @@ class StaffDashboardScreen extends ConsumerWidget {
             ? authState.user!.displayName!.trim()
             : 'Campus Staff');
 
-    final email = authState.profile?.email ?? authState.user?.email ?? '';
+    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'S';
 
     return Scaffold(
       appBar: AppBar(
@@ -34,9 +34,20 @@ class StaffDashboardScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
-            tooltip: 'Sign Out',
-            icon: const Icon(Icons.logout_outlined, color: AppColors.textPrimary),
-            onPressed: () => ref.read(authControllerProvider.notifier).signOut(),
+            tooltip: 'Profile',
+            icon: CircleAvatar(
+              radius: 16,
+              backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            onPressed: () => context.go('/staff/profile'),
           ),
           const SizedBox(width: 8),
         ],
@@ -51,76 +62,6 @@ class StaffDashboardScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Staff Identity Header
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 22,
-                              backgroundColor: AppColors.primary,
-                              child: Text(
-                                displayName.isNotEmpty
-                                    ? displayName[0].toUpperCase()
-                                    : 'S',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    displayName,
-                                    style: textTheme.titleMedium,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    email,
-                                    style: textTheme.bodySmall?.copyWith(
-                                      color: AppColors.textMuted,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Text(
-                                'Staff Admin',
-                                style: TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
                 // Section Title: Campus Incident Metrics
                 Text(
                   'Campus Incident Overview',
@@ -174,7 +115,7 @@ class StaffDashboardScreen extends ConsumerWidget {
                 Card(
                   color: AppColors.primary,
                   child: InkWell(
-                    onTap: () => context.push('/staff/incidents'),
+                    onTap: () => context.go('/staff/incidents'),
                     borderRadius: BorderRadius.circular(12),
                     child: Padding(
                       padding: const EdgeInsets.all(20),
@@ -240,7 +181,7 @@ class StaffDashboardScreen extends ConsumerWidget {
                       ),
                     ),
                     TextButton(
-                      onPressed: () => context.push('/staff/incidents'),
+                      onPressed: () => context.go('/staff/incidents'),
                       child: const Text('View all'),
                     ),
                   ],

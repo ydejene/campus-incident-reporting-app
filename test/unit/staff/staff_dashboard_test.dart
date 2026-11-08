@@ -103,7 +103,7 @@ Widget _buildStaffDashboard({
 
 void main() {
   group('StaffDashboardScreen', () {
-    testWidgets('renders staff identity and admin badge', (tester) async {
+    testWidgets('renders staff profile avatar button in app bar', (tester) async {
       await tester.pumpWidget(
         _buildStaffDashboard(
           dashboardState: const StaffDashboardState(
@@ -118,10 +118,45 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Jean Claude'), findsOneWidget);
-      expect(find.text('j.claude@alueducation.com'), findsOneWidget);
-      expect(find.text('Staff Admin'), findsOneWidget);
+      expect(find.byTooltip('Profile'), findsOneWidget);
+      expect(find.text('J'), findsOneWidget);
+      expect(find.text('Staff Admin'), findsNothing);
       expect(find.text('Campus Incident Overview'), findsOneWidget);
+    });
+
+    testWidgets('tapping profile button navigates to /staff/profile',
+        (tester) async {
+      String? pushedRoute;
+      final router = GoRouter(
+        initialLocation: '/staff',
+        routes: [
+          GoRoute(
+            path: '/staff',
+            builder: (context, state) => const StaffDashboardScreen(),
+          ),
+          GoRoute(
+            path: '/staff/profile',
+            builder: (context, state) {
+              pushedRoute = '/staff/profile';
+              return const Scaffold(body: Text('Staff Profile View'));
+            },
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _buildStaffDashboard(
+          dashboardState: const StaffDashboardState(),
+          router: router,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Profile'));
+      await tester.pumpAndSettle();
+
+      expect(pushedRoute, '/staff/profile');
+      expect(find.text('Staff Profile View'), findsOneWidget);
     });
 
     testWidgets('renders accurate incident statistics counts', (tester) async {

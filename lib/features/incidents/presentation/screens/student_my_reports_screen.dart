@@ -38,6 +38,21 @@ class _StudentMyReportsScreenState
   @override
   Widget build(BuildContext context) {
     final reportsState = ref.watch(myReportsControllerProvider);
+
+    // Synchronize local search text controller when provider state resets (e.g. across
+    // session changes or external filter clears).
+    ref.listen<String>(
+      myReportsControllerProvider.select((s) => s.searchQuery),
+      (prev, next) {
+        if (_searchController.text != next) {
+          _searchController.text = next;
+        }
+      },
+    );
+    if (reportsState.searchQuery.isEmpty && _searchController.text.isNotEmpty) {
+      _searchController.text = '';
+    }
+
     final textTheme = Theme.of(context).textTheme;
     final filtered = reportsState.filteredReports;
 

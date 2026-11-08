@@ -154,7 +154,7 @@ class StaffIncidentsController extends Notifier<StaffIncidentsState> {
   }
 
   void setCategory(IncidentCategory? category) {
-    if (state.selectedCategory == category) {
+    if (category == null || state.selectedCategory == category) {
       state = state.copyWith(clearCategory: true);
     } else {
       state = state.copyWith(selectedCategory: category);
@@ -162,7 +162,7 @@ class StaffIncidentsController extends Notifier<StaffIncidentsState> {
   }
 
   void setStatus(IncidentStatus? status) {
-    if (state.selectedStatus == status) {
+    if (status == null || state.selectedStatus == status) {
       state = state.copyWith(clearStatus: true);
     } else {
       state = state.copyWith(selectedStatus: status);
