@@ -9,6 +9,7 @@ class IncidentStatusHistory {
     required this.updatedBy,
     required this.timestamp,
     this.previousStatus,
+    this.updatedByName,
     this.remarks,
   });
 
@@ -16,6 +17,7 @@ class IncidentStatusHistory {
   final IncidentStatus? previousStatus;
   final IncidentStatus newStatus;
   final String updatedBy;
+  final String? updatedByName;
   final DateTime timestamp;
   final String? remarks;
 
@@ -27,6 +29,7 @@ class IncidentStatusHistory {
           : null,
       newStatus: IncidentStatus.fromString(map['newStatus'] as String?),
       updatedBy: map['updatedBy'] as String? ?? '',
+      updatedByName: map['updatedByName'] as String?,
       timestamp: DateTimeUtils.toDateTime(map['timestamp']),
       remarks: map['remarks'] as String?,
     );
@@ -44,6 +47,7 @@ class IncidentStatusHistory {
       if (previousStatus != null) 'previousStatus': previousStatus!.value,
       'newStatus': newStatus.value,
       'updatedBy': updatedBy,
+      if (updatedByName != null) 'updatedByName': updatedByName,
       'timestamp': timestamp.toIso8601String(),
       if (remarks != null) 'remarks': remarks,
     };
@@ -54,6 +58,7 @@ class IncidentStatusHistory {
       if (previousStatus != null) 'previousStatus': previousStatus!.value,
       'newStatus': newStatus.value,
       'updatedBy': updatedBy,
+      if (updatedByName != null) 'updatedByName': updatedByName,
       'timestamp': DateTimeUtils.toTimestamp(timestamp),
       if (remarks != null) 'remarks': remarks,
     };
@@ -64,6 +69,7 @@ class IncidentStatusHistory {
     IncidentStatus? previousStatus,
     IncidentStatus? newStatus,
     String? updatedBy,
+    String? updatedByName,
     DateTime? timestamp,
     String? remarks,
   }) {
@@ -72,6 +78,7 @@ class IncidentStatusHistory {
       previousStatus: previousStatus ?? this.previousStatus,
       newStatus: newStatus ?? this.newStatus,
       updatedBy: updatedBy ?? this.updatedBy,
+      updatedByName: updatedByName ?? this.updatedByName,
       timestamp: timestamp ?? this.timestamp,
       remarks: remarks ?? this.remarks,
     );
@@ -86,6 +93,7 @@ class IncidentStatusHistory {
           previousStatus == other.previousStatus &&
           newStatus == other.newStatus &&
           updatedBy == other.updatedBy &&
+          updatedByName == other.updatedByName &&
           timestamp == other.timestamp &&
           remarks == other.remarks;
 
@@ -95,6 +103,7 @@ class IncidentStatusHistory {
       previousStatus.hashCode ^
       newStatus.hashCode ^
       updatedBy.hashCode ^
+      updatedByName.hashCode ^
       timestamp.hashCode ^
       remarks.hashCode;
 }

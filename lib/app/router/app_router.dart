@@ -11,6 +11,7 @@ import '../../features/dashboard/presentation/staff/staff_dashboard_screen.dart'
 import '../../features/dashboard/presentation/student/student_home_screen.dart';
 import '../../features/dashboard/presentation/student/student_shell_screen.dart';
 import '../../features/incidents/presentation/screens/incident_detail_screen.dart';
+import '../../features/incidents/presentation/screens/staff_incidents_screen.dart';
 import '../../features/incidents/presentation/screens/student_browse_screen.dart';
 import '../../features/incidents/presentation/screens/student_my_reports_screen.dart';
 import '../../features/incidents/presentation/screens/student_report_screen.dart';
@@ -179,6 +180,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/staff',
         name: 'staffDashboard',
         builder: (context, state) => const StaffDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/staff/incidents',
+        name: 'staffIncidents',
+        builder: (context, state) => const StaffIncidentsScreen(),
       ),
       GoRoute(
         path: '/foundation',
