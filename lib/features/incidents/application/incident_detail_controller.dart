@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../authentication/application/auth_controller.dart';
+import '../../authentication/domain/models/user_role.dart';
 import '../data/repositories/incident_repository.dart';
 import '../domain/models/incident.dart';
+import '../domain/models/incident_private_reporter.dart';
 import '../domain/models/incident_status_history.dart';
 
 /// Bundle containing the incident record and its chronological status history.
@@ -33,4 +36,21 @@ final incidentDetailProvider =
     );
   },
 );
+
+/// Securely loads private reporter information strictly for authenticated staff members.
+///
+/// Returns `null` if the viewing user is not authorized staff.
+final privateReporterProvider =
+    FutureProvider.autoDispose.family<IncidentPrivateReporter?, String>(
+  (ref, incidentId) async {
+    final authState = ref.watch(authControllerProvider);
+    if (authState.profile?.role != UserRole.staff) {
+      return null;
+    }
+
+    final repository = ref.read(incidentRepositoryProvider);
+    return repository.fetchPrivateReporter(incidentId);
+  },
+);
+
 

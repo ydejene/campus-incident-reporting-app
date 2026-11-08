@@ -4,13 +4,15 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/utils/datetime_utils.dart';
 import '../../../../shared/widgets/brand_logo.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../authentication/application/auth_controller.dart';
+import '../../../authentication/domain/models/user_role.dart';
 import '../../application/incident_detail_controller.dart';
+import '../../application/incident_status_update_controller.dart';
 import '../../domain/models/incident.dart';
 import '../../domain/models/incident_status_history.dart';
 
-/// Screen displaying the complete information and status timeline of an incident.
-///
-/// Reusable from both Browse and My Reports destinations.
+/// Screen displaying the complete information, status history, and staff management
+/// controls for an incident.
 class IncidentDetailScreen extends ConsumerWidget {
   const IncidentDetailScreen({
     super.key,
@@ -22,6 +24,8 @@ class IncidentDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detailAsync = ref.watch(incidentDetailProvider(incidentId));
+    final authState = ref.watch(authControllerProvider);
+    final isStaff = authState.profile?.role == UserRole.staff;
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -63,7 +67,8 @@ class IncidentDetailScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
-                    onPressed: () => ref.refresh(incidentDetailProvider(incidentId)),
+                    onPressed: () =>
+                        ref.refresh(incidentDetailProvider(incidentId)),
                     icon: const Icon(Icons.refresh, size: 18),
                     label: const Text('Try Again'),
                   ),
@@ -74,6 +79,7 @@ class IncidentDetailScreen extends ConsumerWidget {
           data: (data) => _IncidentDetailContent(
             incident: data.incident,
             statusHistory: data.statusHistory,
+            isStaff: isStaff,
           ),
         ),
       ),
@@ -85,10 +91,12 @@ class _IncidentDetailContent extends StatelessWidget {
   const _IncidentDetailContent({
     required this.incident,
     required this.statusHistory,
+    required this.isStaff,
   });
 
   final Incident incident;
   final List<IncidentStatusHistory> statusHistory;
+  final bool isStaff;
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +112,8 @@ class _IncidentDetailContent extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -273,7 +282,19 @@ class _IncidentDetailContent extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+
+          // Staff-Only Reporter Information Card (protected by Firestore rules)
+          if (isStaff) ...[
+            _StaffReporterContactCard(incidentId: incident.id),
+            const SizedBox(height: 16),
+          ],
+
+          // Staff Status Management Section (Staff only)
+          if (isStaff) ...[
+            _StaffStatusUpdateCard(incident: incident),
+            const SizedBox(height: 20),
+          ],
 
           // Status History Timeline
           Text(
@@ -331,7 +352,8 @@ class _IncidentDetailContent extends StatelessWidget {
           ],
 
           const SizedBox(height: 24),
-          // Privacy note
+
+          // Privacy Note
           Row(
             children: [
               const Icon(
@@ -342,7 +364,9 @@ class _IncidentDetailContent extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Reporter identity and contact information remain private in campus-wide incident browsing.',
+                  isStaff
+                      ? 'Staff access to reporter information is restricted for maintenance follow-ups.'
+                      : 'Reporter identity and contact information remain private in campus-wide incident browsing.',
                   style: textTheme.bodySmall?.copyWith(
                     color: AppColors.textMuted,
                     fontSize: 11,
@@ -353,6 +377,311 @@ class _IncidentDetailContent extends StatelessWidget {
           ),
           const SizedBox(height: 16),
         ],
+      ),
+    );
+  }
+}
+
+class _StaffReporterContactCard extends ConsumerWidget {
+  const _StaffReporterContactCard({required this.incidentId});
+
+  final String incidentId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reporterAsync = ref.watch(privateReporterProvider(incidentId));
+    final textTheme = Theme.of(context).textTheme;
+
+    return reporterAsync.when(
+      loading: () => const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: LinearProgressIndicator()),
+        ),
+      ),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (reporter) {
+        if (reporter == null) return const SizedBox.shrink();
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.lock_person_outlined,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Reporter Contact (Staff View)',
+                      style: textTheme.labelLarge?.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _DetailRow(
+                  icon: Icons.person_outline,
+                  label: 'Full Name',
+                  value: reporter.reporterName?.trim().isNotEmpty == true
+                      ? reporter.reporterName!.trim()
+                      : 'Not provided',
+                ),
+                const Divider(height: 16),
+                _DetailRow(
+                  icon: Icons.email_outlined,
+                  label: 'Email',
+                  value: reporter.reporterEmail,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StaffStatusUpdateCard extends ConsumerStatefulWidget {
+  const _StaffStatusUpdateCard({required this.incident});
+
+  final Incident incident;
+
+  @override
+  ConsumerState<_StaffStatusUpdateCard> createState() =>
+      _StaffStatusUpdateCardState();
+}
+
+class _StaffStatusUpdateCardState
+    extends ConsumerState<_StaffStatusUpdateCard> {
+  late IncidentStatus _selectedStatus;
+  final _remarksController = TextEditingController();
+  String? _validationError;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedStatus = _defaultTargetStatus(widget.incident.status);
+  }
+
+  @override
+  void didUpdateWidget(covariant _StaffStatusUpdateCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.incident.status != widget.incident.status) {
+      _selectedStatus = _defaultTargetStatus(widget.incident.status);
+      _validationError = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _remarksController.dispose();
+    super.dispose();
+  }
+
+  IncidentStatus _defaultTargetStatus(IncidentStatus current) {
+    switch (current) {
+      case IncidentStatus.submitted:
+        return IncidentStatus.underReview;
+      case IncidentStatus.underReview:
+        return IncidentStatus.inProgress;
+      case IncidentStatus.inProgress:
+        return IncidentStatus.resolved;
+      case IncidentStatus.resolved:
+      case IncidentStatus.rejected:
+        return IncidentStatus.underReview;
+    }
+  }
+
+  Future<void> _submitStatusUpdate() async {
+    setState(() => _validationError = null);
+
+    if (_selectedStatus == widget.incident.status) {
+      setState(() {
+        _validationError =
+            'Please select a different status than the current status.';
+      });
+      return;
+    }
+
+    final remarks = _remarksController.text.trim();
+    if (_selectedStatus == IncidentStatus.rejected && remarks.isEmpty) {
+      setState(() {
+        _validationError =
+            'An explanation is required when rejecting an incident report.';
+      });
+      return;
+    }
+
+    // Require explicit confirmation before saving
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Status Update'),
+        content: Text(
+          'Change status from "${widget.incident.status.label}" to "${_selectedStatus.label}"?'
+          '${remarks.isNotEmpty ? '\n\nRemarks:\n$remarks' : ''}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final success = await ref
+        .read(incidentStatusUpdateControllerProvider.notifier)
+        .updateStatus(
+          incident: widget.incident,
+          newStatus: _selectedStatus,
+          remarks: remarks,
+        );
+
+    if (!mounted) return;
+
+    if (success) {
+      _remarksController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Incident status successfully updated to ${_selectedStatus.label}.',
+          ),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    } else {
+      final err =
+          ref.read(incidentStatusUpdateControllerProvider).errorMessage;
+      if (err != null) {
+        setState(() => _validationError = err);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final updateState = ref.watch(incidentStatusUpdateControllerProvider);
+    final textTheme = Theme.of(context).textTheme;
+    final isSubmitting = updateState.isSubmitting;
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: AppColors.primary.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.edit_note_outlined,
+                  size: 20,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Update Incident Status',
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            // Dropdown to select new status
+            DropdownButtonFormField<IncidentStatus>(
+              initialValue: _selectedStatus,
+              decoration: const InputDecoration(
+                labelText: 'New Status',
+                prefixIcon: Icon(Icons.sync_alt, size: 18),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+              items: IncidentStatus.values.map((status) {
+                return DropdownMenuItem<IncidentStatus>(
+                  value: status,
+                  child: Text(
+                    status == widget.incident.status
+                        ? '${status.label} (Current)'
+                        : status.label,
+                  ),
+                );
+              }).toList(),
+              onChanged: isSubmitting
+                  ? null
+                  : (val) {
+                      if (val != null) {
+                        setState(() {
+                          _selectedStatus = val;
+                          _validationError = null;
+                        });
+                      }
+                    },
+            ),
+            const SizedBox(height: 12),
+
+            // Remarks field
+            TextField(
+              controller: _remarksController,
+              enabled: !isSubmitting,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: _selectedStatus == IncidentStatus.rejected
+                    ? 'Rejection reason *'
+                    : 'Remarks / Instructions (optional)',
+                hintText: _selectedStatus == IncidentStatus.rejected
+                    ? 'Provide a clear explanation for rejecting this report...'
+                    : 'Add notes for the student or facilities records...',
+                errorText: _validationError,
+                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Update button with loading indicator
+            ElevatedButton.icon(
+              onPressed: isSubmitting ? null : _submitStatusUpdate,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+              ),
+              icon: isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.check, size: 18),
+              label: Text(
+                isSubmitting ? 'Updating...' : 'Save Status Update',
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -450,7 +779,10 @@ class _TimelineTile extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          DateTimeUtils.formatDateTime(history.timestamp),
+          history.updatedByName != null &&
+                  history.updatedByName!.trim().isNotEmpty
+              ? 'Updated by ${history.updatedByName} • ${DateTimeUtils.formatDateTime(history.timestamp)}'
+              : DateTimeUtils.formatDateTime(history.timestamp),
           style: textTheme.bodySmall?.copyWith(
             color: AppColors.textMuted,
             fontSize: 12,
@@ -490,4 +822,3 @@ class _TimelineTile extends StatelessWidget {
     );
   }
 }
-

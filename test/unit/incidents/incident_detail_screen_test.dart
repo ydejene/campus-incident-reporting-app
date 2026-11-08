@@ -2,12 +2,42 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:campus_incident_reporting_app/app/theme/app_theme.dart';
+import 'package:campus_incident_reporting_app/features/authentication/application/auth_controller.dart';
+import 'package:campus_incident_reporting_app/features/authentication/application/auth_state.dart';
+import 'package:campus_incident_reporting_app/features/authentication/domain/models/user_profile.dart';
+import 'package:campus_incident_reporting_app/features/authentication/domain/models/user_role.dart';
 import 'package:campus_incident_reporting_app/features/incidents/application/incident_detail_controller.dart';
 import 'package:campus_incident_reporting_app/features/incidents/domain/models/incident.dart';
 import 'package:campus_incident_reporting_app/features/incidents/domain/models/incident_category.dart';
 import 'package:campus_incident_reporting_app/features/incidents/domain/models/incident_status.dart';
 import 'package:campus_incident_reporting_app/features/incidents/domain/models/incident_status_history.dart';
 import 'package:campus_incident_reporting_app/features/incidents/presentation/screens/incident_detail_screen.dart';
+
+class _MockDetailAuthController extends AuthController {
+  _MockDetailAuthController({this.role = UserRole.student});
+
+  final UserRole role;
+
+  @override
+  AuthState build() {
+    final now = DateTime.now();
+    return AuthState(
+      status: role == UserRole.staff
+          ? AuthStatus.authenticatedStaff
+          : AuthStatus.authenticatedStudent,
+      profile: UserProfile(
+        uid: 'user-detail-test',
+        displayName: 'Test User',
+        email: role == UserRole.staff
+            ? 'staff@alueducation.com'
+            : 'student@alustudent.com',
+        role: role,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+}
 
 void main() {
   final now = DateTime(2026, 11, 7, 14, 0);
@@ -26,7 +56,7 @@ void main() {
   );
 
   group('IncidentDetailScreen', () {
-    testWidgets('renders incident details and empty status history card',
+    testWidgets('renders incident details and empty status history card for student',
         (WidgetTester tester) async {
       final mockData = IncidentDetailData(
         incident: testIncident.copyWith(status: IncidentStatus.submitted),
@@ -36,6 +66,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            authControllerProvider
+                .overrideWith(() => _MockDetailAuthController()),
             incidentDetailProvider('inc-detail-01')
                 .overrideWith((ref) => Future.value(mockData)),
           ],
@@ -67,6 +99,9 @@ void main() {
         ),
         findsOneWidget,
       );
+
+      // Verify staff status management is hidden for students
+      expect(find.text('Update Incident Status'), findsNothing);
     });
 
     testWidgets('renders chronological status timeline and remarks',
@@ -77,6 +112,7 @@ void main() {
           previousStatus: IncidentStatus.submitted,
           newStatus: IncidentStatus.underReview,
           updatedBy: 'staff-1',
+          updatedByName: 'Staff Alice',
           timestamp: now.add(const Duration(hours: 1)),
           remarks: 'Reviewed by maintenance team. Assigned to carpenter.',
         ),
@@ -85,6 +121,7 @@ void main() {
           previousStatus: IncidentStatus.underReview,
           newStatus: IncidentStatus.inProgress,
           updatedBy: 'staff-2',
+          updatedByName: 'Staff Bob',
           timestamp: now.add(const Duration(hours: 2)),
           remarks: 'Technician currently on site repairing the latch.',
         ),
@@ -98,6 +135,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            authControllerProvider
+                .overrideWith(() => _MockDetailAuthController()),
             incidentDetailProvider('inc-detail-01')
                 .overrideWith((ref) => Future.value(mockData)),
           ],
@@ -127,6 +166,35 @@ void main() {
       // Verify latest update indicator
       expect(find.text('Latest update'), findsOneWidget);
     });
+
+    testWidgets('renders status update controls for authorized staff',
+        (WidgetTester tester) async {
+      final mockData = IncidentDetailData(
+        incident: testIncident,
+        statusHistory: const [],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authControllerProvider.overrideWith(
+              () => _MockDetailAuthController(role: UserRole.staff),
+            ),
+            incidentDetailProvider('inc-detail-01')
+                .overrideWith((ref) => Future.value(mockData)),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const IncidentDetailScreen(incidentId: 'inc-detail-01'),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Verify status update section is displayed for staff
+      expect(find.text('Update Incident Status'), findsOneWidget);
+      expect(find.text('Save Status Update'), findsOneWidget);
+    });
   });
 }
-

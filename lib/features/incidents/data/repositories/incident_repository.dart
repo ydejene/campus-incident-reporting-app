@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../dashboard/domain/models/staff_dashboard_statistics.dart';
 import '../../domain/models/incident.dart';
 import '../../domain/models/incident_private_reporter.dart';
 import '../../domain/models/incident_status.dart';
@@ -127,6 +128,101 @@ class IncidentRepository {
     return snapshot.docs
         .map((doc) => IncidentStatusHistory.fromFirestore(doc))
         .toList();
+  }
+
+  /// Fetches aggregate counts of incidents across campus for the staff overview.
+  ///
+  /// Uses Firestore aggregation queries (`count().get()`) to guarantee accurate
+  /// campus-wide counts without downloading complete document bodies.
+  Future<StaffDashboardStatistics> fetchIncidentStatistics() async {
+    final collection = firestore.collection(_incidentsCollection);
+
+    final totalQuery = collection.count().get();
+    final submittedQuery = collection
+        .where('status', isEqualTo: IncidentStatus.submitted.value)
+        .count()
+        .get();
+    final inProgressQuery = collection
+        .where('status', isEqualTo: IncidentStatus.inProgress.value)
+        .count()
+        .get();
+    final resolvedQuery = collection
+        .where('status', isEqualTo: IncidentStatus.resolved.value)
+        .count()
+        .get();
+
+    final results = await Future.wait([
+      totalQuery,
+      submittedQuery,
+      inProgressQuery,
+      resolvedQuery,
+    ]);
+
+    return StaffDashboardStatistics(
+      totalIncidents: results[0].count ?? 0,
+      submittedIncidents: results[1].count ?? 0,
+      inProgressIncidents: results[2].count ?? 0,
+      resolvedIncidents: results[3].count ?? 0,
+    );
+  }
+
+  /// Fetches private reporter contact information if available and authorized.
+  Future<IncidentPrivateReporter?> fetchPrivateReporter(
+      String incidentId) async {
+    final doc = await firestore
+        .collection(_incidentsCollection)
+        .doc(incidentId)
+        .collection('private')
+        .doc('reporter')
+        .get();
+
+    if (!doc.exists) {
+      return null;
+    }
+    return IncidentPrivateReporter.fromFirestore(doc);
+  }
+
+  /// Atomically updates the incident status and creates an audit status-history
+  /// document within a single Firestore batch write.
+  ///
+  /// Enforces atomic write consistency: neither the status update nor the
+  /// history entry will be saved independently if the other fails.
+  Future<void> updateIncidentStatus({
+    required String incidentId,
+    required IncidentStatus previousStatus,
+    required IncidentStatus newStatus,
+    required String staffUid,
+    String? staffDisplayName,
+    String? remarks,
+  }) async {
+    final batch = firestore.batch();
+    final incidentRef =
+        firestore.collection(_incidentsCollection).doc(incidentId);
+
+    final now = DateTime.now();
+
+    batch.update(incidentRef, {
+      'status': newStatus.value,
+      'updatedAt': Timestamp.fromDate(now),
+    });
+
+    final historyRef =
+        incidentRef.collection(_statusHistoryCollection).doc();
+
+    final historyData = <String, dynamic>{
+      'previousStatus': previousStatus.value,
+      'newStatus': newStatus.value,
+      'updatedBy': staffUid,
+      if (staffDisplayName != null && staffDisplayName.trim().isNotEmpty)
+        'updatedByName': staffDisplayName.trim(),
+      'timestamp': Timestamp.fromDate(now),
+      if (remarks != null && remarks.trim().isNotEmpty)
+        'remarks': remarks.trim(),
+    };
+
+    batch.set(historyRef, historyData);
+
+    await batch.commit();
   }
 
   /// Builds an [Incident] ready for initial submission.
