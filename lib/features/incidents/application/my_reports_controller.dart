@@ -65,34 +65,56 @@ final myReportsControllerProvider =
 );
 
 class MyReportsController extends Notifier<MyReportsState> {
+  int _currentRequestId = 0;
+  String? _sessionUid;
+
   @override
   MyReportsState build() {
-    Future.microtask(() => loadReports());
-    return const MyReportsState();
-  }
-
-  /// Loads reports created by the currently authenticated student.
-  Future<void> loadReports() async {
-    state = state.copyWith(
-      status: MyReportsStatus.loading,
-      clearError: true,
+    // React to authenticated student session changes.
+    // By selecting the student's UID, this notifier rebuilds only when a student signs in,
+    // signs out, or switches accounts. Other auth mutations (e.g. profile display name updates)
+    // within the same authenticated session do not trigger a rebuild or clear active filters.
+    final currentStudentUid = ref.watch(
+      authControllerProvider.select((authState) {
+        if (authState.status == AuthStatus.authenticatedStudent) {
+          return authState.user?.uid ?? authState.profile?.uid;
+        }
+        return null;
+      }),
     );
 
-    final authState = ref.read(authControllerProvider);
-    if (authState.status != AuthStatus.authenticatedStudent ||
-        authState.user == null) {
-      state = state.copyWith(
-        status: MyReportsStatus.error,
-        errorMessage: 'Please sign in to view your reports.',
-      );
-      return;
+    // Invalidate any in-flight requests from prior sessions and record active UID
+    final requestId = ++_currentRequestId;
+    _sessionUid = currentStudentUid;
+
+    // When not authenticated as a student (logged out, staff, unverified, initial),
+    // return a clean initial state with zero reports and no filters.
+    if (currentStudentUid == null) {
+      return const MyReportsState();
     }
 
-    final uid = authState.user!.uid;
+    // A student session is active (fresh login or account switch).
+    // Start with a clean state: status loading, empty reports, empty search, no status filter.
+    Future.microtask(
+      () => _fetchReportsForSession(currentStudentUid, requestId, isInitial: true),
+    );
 
+    return const MyReportsState(status: MyReportsStatus.loading);
+  }
+
+  /// Fetches reports for [uid] with verification that [requestId] and [uid]
+  /// still match the active session before mutating state.
+  Future<void> _fetchReportsForSession(
+    String uid,
+    int requestId, {
+    bool isInitial = false,
+  }) async {
     try {
       final repository = ref.read(incidentRepositoryProvider);
       final reports = await repository.fetchIncidentsByUser(uid);
+
+      // Verify session and request token have not changed while awaiting Firestore.
+      if (!_isRequestValid(uid, requestId)) return;
 
       state = state.copyWith(
         status: MyReportsStatus.success,
@@ -100,6 +122,9 @@ class MyReportsController extends Notifier<MyReportsState> {
         clearError: true,
       );
     } catch (e) {
+      // Discard errors from superseded or cancelled sessions.
+      if (!_isRequestValid(uid, requestId)) return;
+
       state = state.copyWith(
         status: MyReportsStatus.error,
         errorMessage: _cleanErrorMessage(e),
@@ -107,21 +132,70 @@ class MyReportsController extends Notifier<MyReportsState> {
     }
   }
 
-  /// Refreshes personal report history.
+  bool _isRequestValid(String uid, int requestId) {
+    if (!ref.mounted) {
+      return false;
+    }
+    if (_currentRequestId != requestId || _sessionUid != uid) {
+      return false;
+    }
+    final currentAuth = ref.read(authControllerProvider);
+    final activeUid = currentAuth.user?.uid ?? currentAuth.profile?.uid;
+    if (currentAuth.status != AuthStatus.authenticatedStudent ||
+        activeUid != uid) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Reloads reports created by the currently authenticated student (e.g. error retry).
+  Future<void> loadReports() async {
+    final authState = ref.read(authControllerProvider);
+    final uid = authState.user?.uid ?? authState.profile?.uid;
+    if (authState.status != AuthStatus.authenticatedStudent || uid == null) {
+      state = state.copyWith(
+        status: MyReportsStatus.error,
+        errorMessage: 'Please sign in to view your reports.',
+      );
+      return;
+    }
+
+    final requestId = ++_currentRequestId;
+
+    state = state.copyWith(
+      status: MyReportsStatus.loading,
+      clearError: true,
+    );
+
+    await _fetchReportsForSession(uid, requestId);
+  }
+
+  /// Refreshes personal report history within an active session, preserving
+  /// existing search query and status filter selections.
   Future<void> refresh() async {
     final authState = ref.read(authControllerProvider);
-    if (authState.user == null) return;
+    final uid = authState.user?.uid ?? authState.profile?.uid;
+    if (authState.status != AuthStatus.authenticatedStudent || uid == null) {
+      return;
+    }
+
+    final requestId = ++_currentRequestId;
 
     try {
       final repository = ref.read(incidentRepositoryProvider);
-      final reports = await repository.fetchIncidentsByUser(authState.user!.uid);
+      final reports = await repository.fetchIncidentsByUser(uid);
 
+      if (!_isRequestValid(uid, requestId)) return;
+
+      // Preserve active filters and search query
       state = state.copyWith(
         status: MyReportsStatus.success,
         reports: reports,
         clearError: true,
       );
     } catch (e) {
+      if (!_isRequestValid(uid, requestId)) return;
+
       state = state.copyWith(
         errorMessage: _cleanErrorMessage(e),
       );
