@@ -16,7 +16,7 @@ CampusCare is a university campus incident reporting mobile application engineer
 
 ## Demonstration Video
 
-Demo video: Coming soon.
+Demo video: https://youtu.be/R0Nu7pJ7yfc.
 
 ---
 
